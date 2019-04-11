@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+
+_github_get_projects() {
+	if [ -z "$GITHUB_USERNAME" ]; then
+		echo "error: \$GITHUB_USERNAME not set" >&2
+		return 1
+	fi
+
+	# create empty projects cache
+	[ -f ~/.github_projects ] && cat ~/.github_projects || touch ~/.github_projects
+
+	if [ -z "$GITHUB_ACCESS_TOKEN" ]; then
+		echo "warning: \$GITHUB_ACCESS_TOKEN not set: only showing cached projects" >&2
+		return
+	fi
+
+	# fetch the 100 most recently projects we have edit access to
+	curl -u "$GITHUB_USERNAME:$GITHUB_ACCESS_TOKEN" --header "Accept: application/vnd.github.v3+json" "https://api.github.com/user/repos?sort=updated&per_page=100" 2> /dev/null |
+		jq -r ".[] | .full_name" 2> /dev/null | # extract the repo slug without quotes
+		sort |                                  # filter out projects which are already in the cache
+		comm -13 ~/.github_projects - |         # append to the projects cache
+		tee -a ~/.github_projects &&
+		sort -o ~/.github_projects ~/.github_projects # keep the projects cache sorted  
+}
+
+_fzf_complete_github() {
+	_fzf_complete "" "$@" < <(_github_get_projects)
+}
+
+_fzf_complete_github_notrigger() {
+	FZF_COMPLETION_TRIGGER='' _fzf_complete_github
+}
+
+[ -n "$BASH" ] && complete -F _fzf_complete_github_notrigger -o default -o bashdefault github

@@ -1,0 +1,13 @@
+#!/bin/sh -
+
+if [ -z "$1" ]; then
+	echo "usage: gitlab project" >&2
+	exit 1
+fi
+
+if [ -z "$GITLAB_HOST" ]; then
+	echo "error: \$GITLAB_HOST not set" >&2
+	exit 1
+fi
+
+open "https://$GITLAB_HOST/$1"

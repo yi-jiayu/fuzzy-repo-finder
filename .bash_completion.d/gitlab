@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+
+_gitlab_get_projects() {
+	if [ -z "$GITLAB_HOST" ]; then
+		echo "error: \$GITLAB_HOST not set" >&2
+		return 1
+	fi
+
+	# create empty projects cache
+	[ -f ~/.gitlab_projects ] && cat ~/.gitlab_projects || touch ~/.gitlab_projects
+
+	if [ -z "$GITLAB_ACCESS_TOKEN" ]; then
+		echo "warning: \$GITLAB_ACCESS_TOKEN not set: only showing cached projects" >&2
+		return
+	fi
+
+	# fetch the 100 most recently projects we have edit access to
+	curl --header "Private-Token: $GITLAB_ACCESS_TOKEN" "https://$GITLAB_HOST/api/v4/projects?simple=true&per_page=100&min_access_level=30&order_by=updated_at" 2> /dev/null |
+		jq -r '.[] | .path_with_namespace' | # extract the path with namespace without quotes
+		sort |                               # filter out projects which are already in the cache
+		comm -13 ~/.gitlab_projects - |      # append to the projects cache
+		tee -a ~/.gitlab_projects &&
+		sort -o ~/.gitlab_projects ~/.gitlab_projects # keep the projects cache sorted  
+}
+
+_fzf_complete_gitlab() {
+	_fzf_complete "" "$@" < <(_gitlab_get_projects)
+}
+
+_fzf_complete_gitlab_notrigger() {
+	FZF_COMPLETION_TRIGGER='' _fzf_complete_gitlab
+}
+
+[ -n "$BASH" ] && complete -F _fzf_complete_gitlab_notrigger -o default -o bashdefault gitlab
